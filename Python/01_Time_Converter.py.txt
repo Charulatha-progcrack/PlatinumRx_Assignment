@@ -1,0 +1,9 @@
+total_minutes=int(input())
+hours = total_minutes // 60
+minutes = total_minutes % 60
+if hours == 0:
+	print(f"{minutes} minutes")
+elif minutes == 0:
+	print(f"{hours} hrs")
+else:
+	print(f"{hours} hrs {minutes} minutes")

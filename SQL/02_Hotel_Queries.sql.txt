@@ -1,0 +1,84 @@
+Q1)
+For every user, get user_id and last booked room_no
+
+SELECT u.user_id, b.room_no
+FROM users u
+JOIN bookings b ON u.user_id = b.user_id
+JOIN (
+    SELECT user_id, MAX(booking_date) AS last_date
+    FROM bookings
+    GROUP BY user_id
+) latest ON b.user_id = latest.user_id
+         AND b.booking_date = latest.last_date;
+Q2
+booking_id and total billing amount for every booking in November 2021
+ 
+SELECT bc.booking_id,
+       SUM(bc.item_quantity * i.item_rate) AS total_billing_amount
+FROM bookings b
+JOIN booking_commercials bc ON b.booking_id = bc.booking_id
+JOIN items i ON bc.item_id = i.item_id
+WHERE bc.bill_date >= '2021-11-01'
+  AND bc.bill_date < '2021-12-01'
+GROUP BY bc.booking_id;
+
+Q3
+bill_id and bill amount for October 2021 where amount > 1000
+
+
+SELECT bc.bill_id,
+       SUM(bc.item_quantity * i.item_rate) AS bill_amount
+FROM booking_commercials bc
+JOIN items i ON bc.item_id = i.item_id
+WHERE bc.bill_date >= '2021-10-01'
+  AND bc.bill_date < '2021-11-01'
+GROUP BY bc.bill_id
+HAVING SUM(bc.item_quantity * i.item_rate) > 1000;
+
+Q4
+Most and least ordered item of each month in 2021
+
+WITH monthly_totals AS (
+    SELECT MONTH(bc.bill_date) AS month,
+           i.item_name,
+           SUM(bc.item_quantity) AS total_qty
+    FROM booking_commercials bc
+    JOIN items i ON bc.item_id = i.item_id
+    WHERE YEAR(bc.bill_date) = 2021
+    GROUP BY MONTH(bc.bill_date), i.item_name
+),
+ranked AS (
+    SELECT *,
+           RANK() OVER (PARTITION BY month ORDER BY total_qty DESC) AS rnk_most,
+           RANK() OVER (PARTITION BY month ORDER BY total_qty ASC)  AS rnk_least
+    FROM monthly_totals
+)
+SELECT month, item_name, total_qty,
+       CASE WHEN rnk_most = 1 THEN 'Most Ordered'
+            WHEN rnk_least = 1 THEN 'Least Ordered' END AS category
+FROM ranked
+WHERE rnk_most = 1 OR rnk_least = 1
+ORDER BY month;
+
+Q5
+Customers with 2nd highest bill value each month in 2021
+
+WITH bill_totals AS (
+    SELECT bc.booking_id, bc.bill_id,
+           MONTH(bc.bill_date) AS month,
+           SUM(bc.item_quantity * i.item_rate) AS bill_amount
+    FROM booking_commercials bc
+    JOIN items i ON bc.item_id = i.item_id
+    WHERE YEAR(bc.bill_date) = 2021
+    GROUP BY bc.booking_id, bc.bill_id, MONTH(bc.bill_date)
+),
+ranked AS (
+    SELECT bt.*, b.user_id,
+           DENSE_RANK() OVER (PARTITION BY bt.month ORDER BY bt.bill_amount DESC) AS rnk
+    FROM bill_totals bt
+    JOIN bookings b ON bt.booking_id = b.booking_id
+)
+SELECT month, user_id, bill_id, bill_amount
+FROM ranked
+WHERE rnk = 2
+order by month;
